@@ -1,6 +1,8 @@
 
 
 import model.BankAccount;
+import exceptions.AccountException;
+import model.CheckingAccount;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,16 +41,32 @@ public class ClientInterface {
                     }
                     break;
                 case 2:
-                    deleteAccount();
+                    try {
+                        deleteAccount();
+                    } catch (Exception e) {
+                        System.err.println("Error: " + e.getMessage() + "\n");
+                    }
                     break;
                 case 3:
-                    deposit();
+                    try {
+                        deposit();
+                    } catch (Exception e) {
+                        System.err.println("Error: " + e.getMessage() + "\n");
+                    }
                     break;
                 case 4:
-                    withdraw();
+                    try {
+                        withdraw();
+                    } catch (Exception e) {
+                        System.err.println("Error: " + e.getMessage() + "\n");
+                    }
                     break;
                 case 5:
-                    printInfo();
+                    try {
+                         printInfo();
+                    } catch (Exception e) {
+                        System.err.println("Error: " + e.getMessage() + "\n");
+                    }
                     break;
                 case 6:
                     return;
@@ -65,6 +83,17 @@ public class ClientInterface {
         System.out.println("****************");
         options.forEach(System.out::println);
         System.out.print("\n>>> Choose your option: ");
+    }
+    private BankAccount findAndAuthenticate(String userId, String password) {
+        for (BankAccount account : accounts) {
+            if (account.getUserId().equals(userId)) {
+                if (!account.checkPassword(password)) {
+                    throw new AccountException("Invalid password");
+                }
+                return account;
+            }
+        }
+        throw new AccountException("Account with user ID '" + userId + "' not found");
     }
 
     private void addNewAccount() {
@@ -87,6 +116,18 @@ public class ClientInterface {
         String password = scanner.next();
         System.out.print(">>> Confirm password: ");
         String confirmPassword = scanner.next();
+
+        boolean exists = accounts.stream().anyMatch(a -> a.getUserId().equals(userId));
+        if (exists) {
+            throw new AccountException("Account with user ID '" + userId + "' already exists");
+        }
+        if (!password.equals(confirmPassword)) {
+            throw new AccountException("Passwords do not match");
+        }
+
+        CheckingAccount account = new CheckingAccount(userId, name, password, 0.0);
+        accounts.add(account);
+        System.out.println("Account created successfully.\n");
     }
 
     private void deleteAccount() {
@@ -104,6 +145,14 @@ public class ClientInterface {
         var userId = scanner.next();
         System.out.print(">>> Enter user password: ");
         var password = scanner.next();
+
+        BankAccount account = findAndAuthenticate(userId, password);
+        if (account.getBalance() != 0.0) {
+            throw new AccountException("Cannot delete account with non-zero balance");
+        }
+
+        accounts.remove(account);
+        System.out.println("Account deleted successfully.\n");
     }
 
     private void deposit() {
@@ -122,7 +171,18 @@ public class ClientInterface {
         System.out.print(">>> Enter user password: ");
         var password = scanner.next();
         System.out.print(">>> Enter amount: ");
-        var amount = scanner.next();
+        var amountInput = scanner.next();
+
+        double depositAmount= 0.0;
+        try {
+            depositAmount = Double.parseDouble(amountInput);
+        } catch (NumberFormatException e) {
+            throw new AccountException("Invalid amount format");
+        }
+
+        BankAccount account = findAndAuthenticate(userId, password);
+        account.deposit(depositAmount);
+        System.out.println("Deposit completed successfully.\n");
     }
 
     private void withdraw() {
@@ -141,7 +201,18 @@ public class ClientInterface {
         System.out.print(">>> Enter user password: ");
         var password = scanner.next();
         System.out.print(">>> Enter amount: ");
-        var amount = scanner.next();
+        var amountInput = scanner.next();
+
+        double withdrawAmount= 0.0;
+        try {
+            withdrawAmount = Double.parseDouble(amountInput);
+        } catch (NumberFormatException e) {
+            throw new AccountException("Invalid amount format");
+        }
+
+        BankAccount account = findAndAuthenticate(userId, password);
+        account.withdraw(withdrawAmount);
+        System.out.println("Withdrawal completed successfully.\n");
     }
 
     private void printInfo() {
@@ -161,12 +232,17 @@ public class ClientInterface {
         System.out.print(">>> Enter user password: ");
         var password = scanner.next();
 
+        BankAccount account = findAndAuthenticate(userId, password);
+        double limit = (account instanceof CheckingAccount checking)
+                ? checking.getDailyWithdrawalLimit()
+                : 0.0;
+
         System.out.println("\nAccount info: ");
 
-        System.out.println(" - customer name: ");
-        System.out.println(" - account balance: ");
+        System.out.println(" - customer name: " + account.getCustomerName());
+        System.out.println(" - account balance: " + account.getBalance());
         System.out.println(" - account type: Checking");
-        System.out.println(" - account daily withdrawal limit: ");
+        System.out.println(" - account daily withdrawal limit: " + limit);
 
         System.out.print("\nPress Enter to return to main menu...");
 
